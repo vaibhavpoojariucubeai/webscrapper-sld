@@ -180,77 +180,52 @@ abb_df = scrape_products(product_ids)
 # PDF PRICE EXTRACTION
 # -----------------------------
 
+def extract_prices_from_pdf(pdf_path):
 
+    # Universal ABB product pattern
+    product_pattern = re.compile(r"\b[A-Z0-9]{6,}R\d+\b")
 
+    # Numeric price pattern (e.g., 12,340)
+    price_pattern = re.compile(r"\b\d{1,3}(?:,\d{3})+\b")
 
-
-
-def extract_all_prices(pdf_path):
+    # Upon Request pattern
+    upon_pattern = re.compile(r"Upon Request", re.IGNORECASE)
 
     price_map = {}
-    product_pattern = re.compile(r"1SDA\d{6}R1")
-    price_pattern = re.compile(r"\d{1,3}(?:,\d{3})+")
-    upon_pattern = re.compile(r"Upon\s*Request", re.IGNORECASE)
 
     with pdfplumber.open(pdf_path) as pdf:
 
-        print(f"\nTotal Pages: {len(pdf.pages)}\n")
-
         for page_number, page in enumerate(pdf.pages, start=1):
 
-            chars = page.chars
-
-            if not chars:
+            text = page.extract_text()
+            if not text:
                 continue
 
-            # Sort characters top-to-bottom, left-to-right
-            chars = sorted(chars, key=lambda c: (round(c["top"]), c["x0"]))
+            # Extract in order of appearance
+            products = product_pattern.findall(text)
+            prices = price_pattern.findall(text)
+            upon_requests = upon_pattern.findall(text)
 
-            page_text = ""
-            last_top = None
+            # Combine numeric prices + upon request
+            combined_prices = prices + ["Upon Request"] * len(upon_requests)
 
-            for ch in chars:
-                if last_top is not None and abs(ch["top"] - last_top) > 5:
-                    page_text += "\n"
-                page_text += ch["text"]
-                last_top = ch["top"]
+            pair_count = min(len(products), len(combined_prices))
 
-            # Now run regex globally on reconstructed page text
-            products = list(product_pattern.finditer(page_text))
+            for i in range(pair_count):
 
-            for match in products:
+                product_id = products[i]
+                price = combined_prices[i]
 
-                product_id = match.group()
+                # Prevent overwriting duplicates
+                if product_id not in price_map:
+                    price_map[product_id] = price
 
-                if product_id in price_map:
-                    continue
-
-                # Look at text after product ID (within 120 chars)
-                start = match.end()
-                snippet = page_text[start:start + 120]
-
-                price_match = price_pattern.search(snippet)
-                upon_match = upon_pattern.search(snippet)
-
-                if price_match:
-                    price_map[product_id] = price_match.group()
-
-                    print("--------------------------------------------------")
+                    print("-" * 50)
                     print(f"Product ID: {product_id}")
-                    print(f"Price: {price_match.group()}")
+                    print(f"Price: {price}")
                     print(f"Page: {page_number}")
-                    print("--------------------------------------------------")
 
-                elif upon_match:
-                    price_map[product_id] = "Upon Request"
-
-                    print("--------------------------------------------------")
-                    print(f"Product ID: {product_id}")
-                    print(f"Price: Upon Request")
-                    print(f"Page: {page_number}")
-                    print("--------------------------------------------------")
-
-    print(f"\nTotal Unique Products with Price Found: {len(price_map)}\n")
+    print("\nTotal Unique Products with Price Found:", len(price_map))
 
     return pd.DataFrame(
         [{"Product ID": k, "Price": v} for k, v in price_map.items()]
@@ -258,8 +233,34 @@ def extract_all_prices(pdf_path):
 
 
 print("\nExtracting Prices from PDF...\n")
-price_df = extract_all_prices(pdf_path)
+price_df = extract_prices_from_pdf(pdf_path)
 print(price_df.size)
+
+def count_products_on_price_pages(pdf_path):
+
+    import re
+    import pdfplumber
+
+    product_pattern = re.compile(r"\b[A-Z0-9]{6,}R\d+\b")
+    price_pattern = re.compile(r"\d{1,3}(?:,\d{3})+")
+
+    total_products = set()
+
+    with pdfplumber.open(pdf_path) as pdf:
+        for page in pdf.pages:
+            text = page.extract_text()
+            if not text:
+                continue
+
+            if price_pattern.search(text):  # Only pages with numeric prices
+                products = product_pattern.findall(text)
+                total_products.update(products)
+
+    print("Unique products on pages containing prices:", len(total_products))
+
+
+# Run this once
+count_products_on_price_pages(pdf_path)
 
 final_df = pd.merge(abb_df, price_df, on="Product ID", how="left")
 final_df.to_csv("final_abb_products.csv", index=False)
