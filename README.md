@@ -128,6 +128,61 @@ python abb_scraper.py
 
 ---
 
+## 🐳 Run with Docker
+
+### Shortcuts with Makefile
+
+```bash
+make build   # docker compose build
+make rebuild # docker compose build --no-cache
+make run     # docker compose up scraper
+make up      # build + run
+make build-run # build + run
+make down    # docker compose down -v (clears volumes)
+```
+
+By default, `make run` creates an `output` folder in the project and mounts it to `/output` inside container.
+The final CSV is written there: `output/final_abb_products.csv`.
+
+To use a different host folder:
+
+```bash
+make run OUTPUT_DIR=/mnt/c/Users/vaiba/Desktop/abb-output
+```
+
+### 1️⃣ Build with Docker Compose
+
+```bash
+docker compose build
+```
+
+### 2️⃣ Run scraper with Docker Compose
+
+```bash
+OUTPUT_DIR=./output docker compose up scraper
+```
+
+Windows PowerShell:
+
+```powershell
+$env:OUTPUT_DIR = "./output"; docker compose up scraper
+```
+
+This runs Chrome in a virtual display (`Xvfb`) and is suitable for websites that block true headless browsers.
+
+### 3️⃣ Input / Output files
+
+- Put `data_exp.xlsx` and `price_catalog.pdf` in project root before running.
+- Output `final_abb_products.csv` is written to `output/` on your host (or custom `OUTPUT_DIR`).
+
+### Optional: force headless mode (not recommended for ABB)
+
+```bash
+HEADLESS=true OUTPUT_DIR=./output docker compose up scraper
+```
+
+---
+
 ## 📥 Input Files
 
 ### `data_exp.xlsx`

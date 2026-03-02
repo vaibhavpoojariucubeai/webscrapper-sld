@@ -1,0 +1,12 @@
+services:
+  scraper:
+    container_name: abb-scraper-run
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      HEADLESS: ${HEADLESS:-false}
+      OUTPUT_DIR: /output
+    volumes:
+      - .:/app
+      - ${OUTPUT_DIR:-./output}:/output

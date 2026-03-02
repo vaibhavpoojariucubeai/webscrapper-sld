@@ -2,6 +2,8 @@ import pandas as pd
 import pdfplumber
 import time
 import re
+import os
+import logging
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -16,6 +18,12 @@ excel_path = "data_exp.xlsx"
 pdf_path = "price_catalog.pdf"
 DELAY_SECONDS = 5
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s"
+)
+logger = logging.getLogger(__name__)
+
 
 # -----------------------------
 # LOAD PRODUCT IDS
@@ -24,7 +32,9 @@ df = pd.read_excel(excel_path)
 df["Product ID / Addtl Info"] = df["Product ID / Addtl Info"].astype(str).str.strip()
 product_ids = list(dict.fromkeys(df["Product ID / Addtl Info"].tolist()))
 
-print(f"\nTotal Unique Product IDs Loaded: {len(product_ids)}\n")
+product_ids=product_ids[:5]  # TESTING ONLY - REMOVE THIS LINE FOR FULL RUN
+
+logger.info("Total Unique Product IDs Loaded: %s", len(product_ids))
 
 
 # -----------------------------
@@ -32,8 +42,14 @@ print(f"\nTotal Unique Product IDs Loaded: {len(product_ids)}\n")
 # -----------------------------
 def create_driver():
     options = Options()
-    options.add_argument("--start-maximized")
+    options.add_argument("--window-size=1920,1080")
     options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+
+    headless_mode = os.getenv("HEADLESS", "false").lower()
+    if headless_mode in {"1", "true", "yes"}:
+        options.add_argument("--headless=new")
 
     driver = webdriver.Chrome(options=options)
 
@@ -85,7 +101,7 @@ def scrape_products(product_ids):
 
     for idx, product_id in enumerate(product_ids, start=1):
 
-        print(f"\n[{idx}/{len(product_ids)}] Scraping: {product_id}")
+        logger.info("[%s/%s] Scraping: %s", idx, len(product_ids), product_id)
 
         data = {
             "Product ID": product_id,
@@ -152,14 +168,14 @@ def scrape_products(product_ids):
                 body_text, "Rated Service Short-Circuit Breaking Capacity"
             )
 
-            print("--------------------------------------------------")
+            logger.info("--------------------------------------------------")
             for k, v in data.items():
                 if v:
-                    print(f"{k}: {v}")
-            print("--------------------------------------------------")
+                    logger.info("%s: %s", k, v)
+            logger.info("--------------------------------------------------")
 
         except Exception as e:
-            print(f"❌ Error scraping {product_id}: {str(e)}")
+            logger.error("Error scraping %s: %s", product_id, str(e))
 
         results.append(data)
         time.sleep(DELAY_SECONDS)
@@ -168,7 +184,7 @@ def scrape_products(product_ids):
     return pd.DataFrame(results)
 
 
-print("Starting ABB Scraping...\n")
+logger.info("Starting ABB Scraping...")
 
 # 🔥 TEST FIRST
 product_ids = product_ids[:5]
@@ -220,21 +236,21 @@ def extract_prices_from_pdf(pdf_path):
                 if product_id not in price_map:
                     price_map[product_id] = price
 
-                    print("-" * 50)
-                    print(f"Product ID: {product_id}")
-                    print(f"Price: {price}")
-                    print(f"Page: {page_number}")
+                    logger.info("%s", "-" * 50)
+                    logger.info("Product ID: %s", product_id)
+                    logger.info("Price: %s", price)
+                    logger.info("Page: %s", page_number)
 
-    print("\nTotal Unique Products with Price Found:", len(price_map))
+    logger.info("Total Unique Products with Price Found: %s", len(price_map))
 
     return pd.DataFrame(
         [{"Product ID": k, "Price": v} for k, v in price_map.items()]
     )
 
 
-print("\nExtracting Prices from PDF...\n")
+logger.info("Extracting Prices from PDF...")
 price_df = extract_prices_from_pdf(pdf_path)
-print(price_df.size)
+logger.info("Price DataFrame size: %s", price_df.size)
 
 def count_products_on_price_pages(pdf_path):
 
@@ -256,14 +272,17 @@ def count_products_on_price_pages(pdf_path):
                 products = product_pattern.findall(text)
                 total_products.update(products)
 
-    print("Unique products on pages containing prices:", len(total_products))
+    logger.info("Unique products on pages containing prices: %s", len(total_products))
 
 
 # Run this once
 count_products_on_price_pages(pdf_path)
 
 final_df = pd.merge(abb_df, price_df, on="Product ID", how="left")
-final_df.to_csv("final_abb_products.csv", index=False)
+output_dir = os.getenv("OUTPUT_DIR", ".")
+os.makedirs(output_dir, exist_ok=True)
+output_file = os.path.join(output_dir, "final_abb_products.csv")
+final_df.to_csv(output_file, index=False)
 
-print("\n✅ Final file saved as: final_abb_products.csv")
-print("🚀 Process Completed Successfully")
+logger.info("Final file saved as: %s", output_file)
+logger.info("Process Completed Successfully")

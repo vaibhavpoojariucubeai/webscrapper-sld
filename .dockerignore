@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+.venv/
+.git/
+.gitignore
+.vscode/
+final_abb_products.csv
