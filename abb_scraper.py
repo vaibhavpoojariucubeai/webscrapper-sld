@@ -90,9 +90,6 @@ def extract_field(text, label):
 # -----------------------------
 # SCRAPER
 # -----------------------------
-# -----------------------------
-# SCRAPER
-# -----------------------------
 def scrape_products(product_ids):
 
     driver = create_driver()
@@ -187,7 +184,7 @@ def scrape_products(product_ids):
 logger.info("Starting ABB Scraping...")
 
 # 🔥 TEST FIRST
-product_ids = product_ids[:5]
+# product_ids = product_ids[:5]
 
 abb_df = scrape_products(product_ids)
 
