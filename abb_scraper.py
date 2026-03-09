@@ -16,7 +16,7 @@ from selenium.webdriver.support import expected_conditions as EC
 # -----------------------------
 excel_path = "data_exp.xlsx"
 pdf_path = "price_catalog.pdf"
-DELAY_SECONDS = 5
+DELAY_SECONDS = 10
 
 logging.basicConfig(
     level=logging.INFO,
@@ -32,7 +32,7 @@ df = pd.read_excel(excel_path)
 df["Product ID / Addtl Info"] = df["Product ID / Addtl Info"].astype(str).str.strip()
 product_ids = list(dict.fromkeys(df["Product ID / Addtl Info"].tolist()))
 
-product_ids=product_ids[:5]  # TESTING ONLY - REMOVE THIS LINE FOR FULL RUN
+# product_ids=product_ids[:5]  # TESTING ONLY - REMOVE THIS LINE FOR FULL RUN
 
 logger.info("Total Unique Product IDs Loaded: %s", len(product_ids))
 
